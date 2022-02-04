@@ -16,7 +16,7 @@ This file could be ran to obtain the results after which **churn_script_logging_
 All the results are saved in the results folder in jpg. format within the Images folder.
 
 below mentioned line of code should produce the .log file with the result from running all tests :
-ipython churn_script_logging_and_tests_solution.py
+"""ipython churn_script_logging_and_tests_solution.py"""
 
 Result of tests/logs are available in logs folder. 
 Images folder will container the output results.
