@@ -2,20 +2,20 @@
 Python script to find out the customer churn
 """
 
-
 # import libraries
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import train_test_split
-from sklearn.model_selection import GridSearchCV
-from sklearn.metrics import classification_report
-import joblib
+import os
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-import os
 import pylint
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+from sklearn.model_selection import GridSearchCV
+from sklearn.metrics import classification_report, plot_roc_curve
+import joblib
+
 
 def import_data(file_path):  
     '''
@@ -26,11 +26,11 @@ def import_data(file_path):
     output:
             df : pandas dataframe
     '''	 
-    df = pd.read_csv(file_path)
-    df["Churn"] = df.Attrition_Flag.apply(lambda val: 0 if val == "Existing Customer" else 1)
-    return df
+    dataframe = pd.read_csv(file_path)
+    dataframe["Churn"] = dataframe.Attrition_Flag.apply(lambda val: 0 if val == "Existing Customer" else 1)
+    return dataframe
 
-def perform_eda(df,eda_output_path):   
+def perform_eda(dataframe,eda_output_path):   
     '''
     perform exploratory data analysis on df and save figures to images folder
     input:
@@ -44,24 +44,24 @@ def perform_eda(df,eda_output_path):
         plt.figure(figsize=(20, 10))
         if column_name == "Churn":
             plt.title("Churn")
-            df.Churn.hist()
+            dataframe.Churn.hist()
         elif column_name == "Customer_Age":
             plt.title("customer age")
-            df.Customer_Age.hist()
+            dataframe.Customer_Age.hist()
         elif column_name == "Marital_Status":
             plt.title("Marital Staus")
-            df.Marital_Status.value_counts("normalize").plot(kind="bar")
+            dataframe.Marital_Status.value_counts("normalize").plot(kind="bar")
         elif column_name == "Total_Trans":
             plt.title("Total_Trans_count")
-            sns.displot(df.Total_Trans_Ct)
+            sns.displot(dataframe.Total_Trans_Ct)
         plt.savefig(os.path.join(eda_output_path, str(column_name)+".jpg"))
         plt.close()
     plt.title("Heat Map")
-    sns.heatmap(df.corr(), annot=False, cmap="Dark2_r", linewidths=2)
+    sns.heatmap(dataframe.corr(), annot=False, cmap="Dark2_r", linewidths=2)
     plt.savefig(os.path.join(eda_output_path, "Heat_map.jpg"))
     plt.close()
         
-def encoder_helper(df, category_list):
+def encoder_helper(dataframe, category_list):
     '''
     helper function to turn each categorical column into a new column with
     propotion of churn for each category - associated with cell 15 from the notebook
@@ -74,15 +74,14 @@ def encoder_helper(df, category_list):
     '''
     for category in category_list:
         category_list = []
-        category_groups = df.groupby(category).mean()["Churn"]
-        
-        for val in df[category]:
+        category_groups = dataframe.groupby(category).mean()["Churn"] 
+        for val in dataframe[category]:
             category_list.append(category_groups.loc[val])
             
-        df["%s_%s" % (category, "Churn")] = category_list  
-    return df
+        dataframe["%s_%s" % (category, "Churn")] = category_list  
+    return dataframe
 
-def perform_feature_engineering(df):
+def perform_feature_engineering(dataframe):
     '''
     input:
               df: pandas dataframe
@@ -95,7 +94,7 @@ def perform_feature_engineering(df):
               y_test: y testing data
     '''
     
-    target = df["Churn"] 
+    target = dataframe["Churn"] 
     feature_columns = [
         "Customer_Age",
         "Dependent_count",
@@ -117,7 +116,7 @@ def perform_feature_engineering(df):
         "Income_Category_Churn",
         "Card_Category_Churn"]
     
-    features = df[feature_columns]
+    features = dataframe[feature_columns]
 
     # train test split
     x_train, x_test, y_train, y_test = train_test_split(features,
@@ -247,24 +246,38 @@ def train_models(x_train, x_test, y_train, y_test):
                                 y_test_preds_rf)
 
     feature_importance_plot(cv_rfc, x_test, "feature_importance")
-
+    
+    #dump models
     joblib.dump(cv_rfc.best_estimator_, r"models\rfc_model.pkl")
     joblib.dump(lrc, "models/logistic_model.pkl")
+    
+    # Load models
+    rfc_model = joblib.load('./models/rfc_model.pkl')
+    lr_model = joblib.load('./models/logistic_model.pkl')
+     
+    # Plot and save ROC Curve
+    lrc_plot = plot_roc_curve(lr_model, x_test, y_test)
+    plt.figure(figsize=(15, 10))
+    ax = plt.gca()
+    roc_rf_plot = plot_roc_curve(rfc_model, x_test, y_test, ax=ax, alpha=0.8)
+    lrc_plot.plot(ax=ax, alpha=0.75)
+    plt.savefig('./Images/results/roc_curve_result.png')
+    plt.clf()
 
 if __name__ == "__main__":
     
     os.environ['QT_QPA_PLATFORM']='offscreen'
     dataset_path = r"data\bank_data.csv"
     image_output_path = r"Images\eda"
-    df = import_data(dataset_path)
-    perform_eda(df, image_output_path)
+    dataframe = import_data(dataset_path)
+    perform_eda(dataframe, image_output_path)
     encoder_category_list = ["Gender",
                               "Education_Level",
                               "Marital_Status",
                               "Income_Category",
                               "Card_Category"]
     
-    encoded_data_df = encoder_helper(df, encoder_category_list)
+    encoded_data_df = encoder_helper(dataframe, encoder_category_list)
     
     x_train_, x_test_, y_train_, y_test_ = perform_feature_engineering(encoded_data_df)
     train_models(x_train_, x_test_, y_train_, y_test_)
