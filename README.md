@@ -1,1 +1,1 @@
-This repository contains the project focused on clean code principle
+This repository contains the project focused on predicting customer churn, clean code principle is being followed throughout.
